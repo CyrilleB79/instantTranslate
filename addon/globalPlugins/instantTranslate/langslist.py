@@ -21,6 +21,8 @@ def g(code):
 needed_codes = {
 	# Translators: An option to automatically detect source language for translation.
 	"auto":_("Automatically detect language"),
+	# Translators: An option to set last source language for translation target.
+	"last":_("Last detected source language"),
 	# Translators: The name of a language supported by this add-on.
 	"ceb":_("Cebuano"),
 	# Translators: The name of a language supported by this add-on.
@@ -63,6 +65,7 @@ needed_codes = {
 
 langcodes = [
 	"auto",
+	"last",
 	"af",
 	"am",
 	"ar",

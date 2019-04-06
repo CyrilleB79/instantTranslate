@@ -32,6 +32,7 @@ from speech import LangChangeCommand, speak
 import braille
 import wx
 import six
+from logHandler import log
 
 _addonDir = os.path.join(os.path.dirname(__file__), "..", "..")
 if isinstance(_addonDir, bytes):
@@ -101,6 +102,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self.toggling = False
 		self.maxCachedResults = 5
 		self.cachedResults = []
+		self.last_detected_lang = "en"
 		gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(InstantTranslateSettingsPanel)
 
 	def getUpdatedGlobalVars(self):
@@ -185,16 +187,26 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 #		if lang_from == "auto":
 #			lang_from = detect_language(text)
 		translation = None
-		if (text, lang_to, lang_from) in [(x[0],x[1],x[2]) for x in self.cachedResults]:
-			translation,lang = [f for f in self.cachedResults if f[0] == text and f[1] == lang_to and f[2] == lang_from][0][3:5]
-			index = [(te,lt,lf,tr) for te, lt, lf, tr, lg in self.cachedResults].index((text, lang_to, lang_from, translation))
+		lang_target = lang_to
+		if lang_target == "last":
+			lang_target = self.last_detected_lang
+		if (text, lang_target, lang_from) in [(x[0],x[1],x[2]) for x in self.cachedResults]:
+			translation,lang,detectedLang = [f for f in self.cachedResults if f[0] == text and f[1] == lang_target and f[2] == lang_from][0][3:6]
+			index = [(te,lt,lf,tr) for te, lt, lf, tr, lg, ldl in self.cachedResults].index((text, lang_target, lang_from, translation))
 			self.addResultToCache(text, translation, lang, removeIndex=index)
+			log.debug(self.cachedResults[-1])
+			if lang_from == "auto" and detectedLang is not None:
+				self.last_detected_lang = self.cachedResults[-1][5]
+				log.debug('LastDetLang : ' + self.last_detected_lang)
 		else:
 			myTranslator = None
 			if not autoSwap:
-				myTranslator = Translator(lang_from, lang_to, text)
+				myTranslator = Translator(lang_from, lang_target, text)
+				log.debug( 'Trans: ' + str( (lang_from, lang_target, text) ))
 			else:
-				myTranslator = Translator(lang_from, lang_to, text, lang_swap)
+				translatorLangSwap = lang_swap if lang_swap != "last" else self.last_detected_lang
+				myTranslator = Translator(lang_from, lang_target, text, translatorLangSwap)
+				log.debug('TransSwap: ' + str( (lang_from, lang_target, text, lang_swap) ))
 			myTranslator.start()
 			i=0
 			while myTranslator.is_alive():
@@ -206,18 +218,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			myTranslator.join()
 			translation = myTranslator.translation
 			lang = myTranslator.lang_to
+			log.debug('LangTo = ' + lang)
 			if translation != '':
 				self.addResultToCache(text, translation, lang)
+				if lang_from == "auto" and lang_to != myTranslator.lang_detected:
+					self.last_detected_lang = myTranslator.lang_detected
 		msgTranslation = {'text': translation, 'lang': lang}
 		queueHandler.queueFunction(queueHandler.eventQueue, messageWithLangDetection, msgTranslation)
 		self.copyResult(translation)
 
 	def addResultToCache(self, text, translation, lang, removeIndex=0):
+		lang_target = lang_to if lang_to != "last" else self.last_detected_lang
 		if removeIndex:
 			del self.cachedResults[removeIndex]
 		elif len(self.cachedResults) == self.maxCachedResults:
 			del self.cachedResults[0]
-		self.cachedResults.append((text, lang_to, lang_from, translation, lang))
+		lastDetectedLang = self.last_detected_lang if self.last_detected_lang != lang_target else None
+		self.cachedResults.append((text, lang_target, lang_from, translation, lang, lastDetectedLang))
 
 	def copyResult(self, translation, ignoreSetting=False):
 		if ignoreSetting:
@@ -247,17 +264,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# Translators: message presented to announce that the source and target languages have been swapped.
 		ui.message(_("Languages swapped"))
 		# Translators: message presented to announce the current source and target languages.
-		ui.message(_("Translate: from {lang1} to {lang2}").format(lang1=lang_from, lang2=lang_to))
+		self.announceLanguages(lang_from, lang_to)
 		self.script_translateSelection(gesture)
 	# Translators: Presented in input help mode.
 	script_swapLanguages.__doc__ = _("It swaps source and target languages.")
 
 	def script_announceLanguages(self, gesture):
 		self.getUpdatedGlobalVars()
-		# Translators: message presented to announce the current source and target languages.
-		ui.message(_("Translate: from {lang1} to {lang2}").format(lang1=lang_from, lang2=lang_to))
+		self.announceLanguages(lang_from, lang_to)
 	# Translators: Presented in input help mode.
 	script_announceLanguages.__doc__ = _("It announces the current source and target languages.")
+	
+	def announceLanguages(self, lang_from, lang_to):
+		lang_to_full = lang_to
+		if lang_to == 'last':
+			lang_to_full = _("{lang} (last)").format(lang=self.last_detected_lang)
+		# Translators: message presented to announce the current source and target languages.
+		ui.message(_("Translate: from {lang1} to {lang2}").format(lang1=lang_from, lang2=lang_to_full))
 
 	def script_copyLastResult(self, gesture):
 		self.getUpdatedGlobalVars()

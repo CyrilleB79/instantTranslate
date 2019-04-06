@@ -41,14 +41,15 @@ class InstantTranslateSettingsPanel(gui.SettingsPanel):
 		# zh-TW is not present in sources, on site
 		temp1 = deepcopy(temp)
 		temp1.remove(lngModule.g("zh-TW"))
+		temp1.insert(0, lngModule.g("auto"))
 		self._fromChoice = wx.Choice(self, choices=temp1)
 		fromSizer.Add(self._fromChoice)
 		intoSizer = wx.BoxSizer(wx.HORIZONTAL)
 		# Translators: A setting in addon settings dialog.
 		intoLabel = wx.StaticText(self, label=_("Target language:"))
 		intoSizer.Add(intoLabel)
-		# auto has no sense in target
-		temp.remove(lngModule.g("auto"))
+		#zzz # auto has no sense in target
+		#zzz temp.remove(lngModule.g("auto"))
 		self._intoChoice = wx.Choice(self, choices=temp)
 		intoSizer.Add(self._intoChoice)
 		sizer.Add(fromSizer)
@@ -61,7 +62,10 @@ class InstantTranslateSettingsPanel(gui.SettingsPanel):
 		# Translators: A setting in addon settings dialog, shown if source language is on auto.
 		swapLabel = wx.StaticText(self, label=_("Language for swapping:"))
 		self.swapSizer.Add(swapLabel)
-		self._swapChoice = wx.Choice(self, choices=temp)
+		temp2 = deepcopy(temp)
+		# Add last detected as swap target
+		temp2.insert(0,lngModule.g("last"))
+		self._swapChoice = wx.Choice(self, choices=temp2)
 		self._fromChoice.Bind(wx.EVT_CHOICE, lambda event, sizer=sizer: self.onFromSelect(event, sizer))
 		self.swapSizer.Add(self._swapChoice)
 		sizer.Add(self.swapSizer)
@@ -86,6 +90,8 @@ class InstantTranslateSettingsPanel(gui.SettingsPanel):
 		keys=list(langslist.keys())
 		auto=lngModule.g("auto")
 		keys.remove(auto)
+		last=lngModule.g("last")
+		keys.remove(last)
 		if sys.version_info[0] >= 3:
 			keys.sort(key=strxfrm)
 		else:
