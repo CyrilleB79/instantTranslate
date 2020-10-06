@@ -63,10 +63,7 @@ needed_codes = {
 	"yi":_("Yiddish"),
 }
 
-langcodes = [
-	"auto",
-	"last",
-	"af",
+langcodes = ["af",
 	"am",
 	"ar",
 	"az",
@@ -180,3 +177,5 @@ langcodes = [
 langslist = {}
 for code in langcodes:
 	langslist[g(code)] = code
+extendedLangsList = {g(code): code for code in ["auto", "last"]}
+extendedLangsList.update(langslist)

@@ -10,12 +10,11 @@ import os.path
 import sys
 import wx
 import gui
-from .langslist import langslist
+from .langslist import langslist, extendedLangsList
 from . import langslist as lngModule
 import globalVars
 import config
 import addonHandler
-from copy import deepcopy
 from locale import strxfrm
 
 addonHandler.initTranslation()
@@ -37,20 +36,17 @@ class InstantTranslateSettingsPanel(gui.SettingsPanel):
 		fromLabel = wx.StaticText(self, label=_("Source language:"))
 		fromSizer.Add(fromLabel)
 		# list of choices, in alphabetical order but with auto in first position
-		temp = self.prepareChoices()
+		fromChoiceList = self.prepareChoices(addAuto=True)
 		# zh-TW is not present in sources, on site
-		temp1 = deepcopy(temp)
-		temp1.remove(lngModule.g("zh-TW"))
-		temp1.insert(0, lngModule.g("auto"))
-		self._fromChoice = wx.Choice(self, choices=temp1)
+		fromChoiceList.remove(lngModule.g("zh-TW"))
+		self._fromChoice = wx.Choice(self, choices=fromChoiceList)
 		fromSizer.Add(self._fromChoice)
 		intoSizer = wx.BoxSizer(wx.HORIZONTAL)
 		# Translators: A setting in addon settings dialog.
 		intoLabel = wx.StaticText(self, label=_("Target language:"))
 		intoSizer.Add(intoLabel)
-		#zzz # auto has no sense in target
-		#zzz temp.remove(lngModule.g("auto"))
-		self._intoChoice = wx.Choice(self, choices=temp)
+		intoList = self.prepareChoices()
+		self._intoChoice = wx.Choice(self, choices=intoList)
 		intoSizer.Add(self._intoChoice)
 		sizer.Add(fromSizer)
 		sizer.Add(intoSizer)
@@ -62,10 +58,8 @@ class InstantTranslateSettingsPanel(gui.SettingsPanel):
 		# Translators: A setting in addon settings dialog, shown if source language is on auto.
 		swapLabel = wx.StaticText(self, label=_("Language for swapping:"))
 		self.swapSizer.Add(swapLabel)
-		temp2 = deepcopy(temp)
-		# Add last detected as swap target
-		temp2.insert(0,lngModule.g("last"))
-		self._swapChoice = wx.Choice(self, choices=temp2)
+		swapChoiceList = self.prepareChoices(addLastLang=True)
+		self._swapChoice = wx.Choice(self, choices=swapChoiceList)
 		self._fromChoice.Bind(wx.EVT_CHOICE, lambda event, sizer=sizer: self.onFromSelect(event, sizer))
 		self.swapSizer.Add(self._swapChoice)
 		sizer.Add(self.swapSizer)
@@ -86,21 +80,20 @@ class InstantTranslateSettingsPanel(gui.SettingsPanel):
 	def postInit(self):
 		self._fromChoice.SetFocus()
 
-	def prepareChoices(self):
+	def prepareChoices(self, addAuto=False, addLastLang=False):
 		keys=list(langslist.keys())
-		auto=lngModule.g("auto")
-		keys.remove(auto)
-		last=lngModule.g("last")
-		keys.remove(last)
 		if sys.version_info[0] >= 3:
 			keys.sort(key=strxfrm)
 		else:
 			# Python 2: strxfrm does not seem to work correctly, so do not use locale rules for sorting.
 			keys.sort()
-		choices=[]
-		choices.append(auto)
-		choices.extend(keys)
-		return choices
+		if addAuto:
+			auto=lngModule.g("auto")
+			keys.insert(0, auto)
+		if addLastLang:
+			last=lngModule.g("last")
+			keys.insert(0, last)
+		return keys
 
 	def onFromSelect(self, event, sizer):
 		if event.GetString() == lngModule.g("auto"):
@@ -112,9 +105,9 @@ class InstantTranslateSettingsPanel(gui.SettingsPanel):
 
 	def onSave(self):
 		# Update Configuration
-		config.conf['instanttranslate']['from'] = langslist[self._fromChoice.GetStringSelection()]
-		config.conf['instanttranslate']['into'] = langslist[self._intoChoice.GetStringSelection()]
-		config.conf['instanttranslate']['swap'] = langslist[self._swapChoice.GetStringSelection()]
+		config.conf['instanttranslate']['from'] = extendedLangsList[self._fromChoice.GetStringSelection()]
+		config.conf['instanttranslate']['into'] = extendedLangsList[self._intoChoice.GetStringSelection()]
+		config.conf['instanttranslate']['swap'] = extendedLangsList[self._swapChoice.GetStringSelection()]
 		config.conf['instanttranslate']['copytranslatedtext'] = self.copyTranslationChk.GetValue()
 		config.conf['instanttranslate']['autoswap'] = self.autoSwapChk.GetValue()
 
