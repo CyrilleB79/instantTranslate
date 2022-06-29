@@ -115,6 +115,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		self._speak = speechModule.speak
 		speechModule.speak = self._localSpeak
 		self.lastSpokenText = ''
+		self.lastIdentifiedLanguage = None
 
 	def getUpdatedGlobalVars(self):
 		global lang_from, lang_to, lang_swap, copyTranslation, autoSwap, isAutoSwapped, replaceUnderscores
@@ -225,6 +226,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			if translation != '':
 				self.addResultToCache(text, translation, lang)
 		msgTranslation = {'text': translation, 'lang': lang}
+		self.lastIdentifiedLanguage = lang
 		queueHandler.queueFunction(queueHandler.eventQueue, messageWithLangDetection, msgTranslation)
 		self.copyResult(translation)
 
@@ -314,9 +316,16 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 					i = 0
 			myTranslator.join()
 			language = myTranslator.lang_detected
+			self.lastIdentifiedLanguage = language
 			queueHandler.queueFunction(queueHandler.eventQueue, ui.message, g(language))
 	# Translators: Presented in input help mode.
 	script_identifyLanguage.__doc__ = _("It identifies the language of selected text")
+
+	def script_useLastIdentifiedLanguageAsSwapLanguage(self, gesture):
+		config.conf['instanttranslate']['swap'] = self.lastIdentifiedLanguage
+		ui.message(_("Swap language set to {lang}".format(lang=g(self.lastIdentifiedLanguage))))
+	# Translators: Presented in input help mode.
+	script_useLastIdentifiedLanguageAsSwapLanguage.__doc__ = _("It identifies the language of selected text")
 
 	def _localSpeak(self, sequence, *args, **kwargs):
 		self._speak(sequence, *args, **kwargs)
@@ -344,6 +353,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		"kb:a":"announceLanguages",
 		"kb:c":"copyLastResult",
 		"kb:i":"identifyLanguage",
+		"kb:shift+i":"useLastIdentifiedLanguageAsSwapLanguage",
 		"kb:l":"translateLastSpokenText",
 		"kb:o":"showSettings",
 		"kb:h":"displayHelp",
