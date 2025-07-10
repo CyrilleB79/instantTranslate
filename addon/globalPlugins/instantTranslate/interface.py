@@ -10,8 +10,7 @@ import wx
 import gui
 import gui.guiHelper
 from gui.settingsDialogs import SettingsPanel
-from .langslist import langslist
-from . import langslist as lngModule
+from .langslist import dicSourceLang, dicTargetLang
 import addonHandler
 from copy import deepcopy
 from locale import strxfrm
@@ -32,21 +31,17 @@ class InstantTranslateSettingsPanel(SettingsPanel):
 		# Translators: A setting in addon settings dialog.
 		fromLabelText = _("Source language:")
 		# list of choices, in alphabetical order but with auto in first position
-		temp = self.prepareChoices()
-		# zh-TW is not present in sources, on site
-		temp1 = deepcopy(temp)
-		temp1.remove(lngModule.g("zh-TW"))
-		self._fromChoice = helper.addLabeledControl(fromLabelText, wx.Choice, choices=temp1)
+		targetChoices = self.prepareChoices(source=False)
+		sourceChoices = self.prepareChoices(source=True)
+		self._fromChoice = helper.addLabeledControl(fromLabelText, wx.Choice, choices=sourceChoices)
 		
 		# Translators: A setting in addon settings dialog.
 		intoLabelText = _("Target language:")
-		# auto has no sense in target
-		temp.remove(lngModule.g("auto"))
-		self._intoChoice = helper.addLabeledControl(intoLabelText, wx.Choice, choices=temp)
+		self._intoChoice = helper.addLabeledControl(intoLabelText, wx.Choice, choices=targetChoices)
 		
 		# Translators: A setting in addon settings dialog, shown if source language is on auto.
 		swapLabelText = _("Language for swapping:")
-		self._swapChoice = helper.addLabeledControl(swapLabelText, wx.Choice, choices=temp)
+		self._swapChoice = helper.addLabeledControl(swapLabelText, wx.Choice, choices=targetChoices)
 		self._fromChoice.Bind(wx.EVT_CHOICE, self.onFromSelect)
 		
 		# Translators: A setting in addon settings dialog, shown if source language is on auto.
@@ -67,9 +62,10 @@ class InstantTranslateSettingsPanel(SettingsPanel):
 		self.donateBtn = helper.addItem(wx.Button(self, label=_("Support an author...")))
 		self.donateBtn.Bind(wx.EVT_BUTTON, self.onDonate)
 
-		iLang_from = self._fromChoice.FindString(self.getDictKey(self.addonConf['from']))
-		iLang_to = self._intoChoice.FindString(self.getDictKey(self.addonConf['into']))
-		iLang_swap = self._swapChoice.FindString(self.getDictKey(self.addonConf['swap']))
+		iLang_from = self._fromChoice.FindString(dicSourceLang[self.addonConf['from']])
+		iLang_to = self._intoChoice.FindString(dicTargetLang[self.addonConf['into']])
+		iLang_swap = self._swapChoice.FindString(dicTargetLang[self.addonConf['swap']])
+		
 		self._fromChoice.Select(iLang_from)
 		self._intoChoice.Select(iLang_to)
 		self._swapChoice.Select(iLang_swap)
@@ -84,18 +80,25 @@ class InstantTranslateSettingsPanel(SettingsPanel):
 		from .donate_dialog import requestDonations
 		requestDonations(self)
 
-	def prepareChoices(self):
-		keys=list(langslist.keys())
-		auto=lngModule.g("auto")
-		keys.remove(auto)
-		keys.sort(key=strxfrm)
+	def prepareChoices(self, source=True):
+		if source:
+			dic = dicSourceLang
+		else:
+			dic = dicTargetLang
+		values = list(dic.values())
+		try:
+			values.remove(dic["auto"])
+		except KeyError:
+			pass
+		values.sort(key=strxfrm)
 		choices=[]
-		choices.append(auto)
-		choices.extend(keys)
+		if source:
+			choices.append(dic["auto"])
+		choices.extend(values)
 		return choices
-
+		
 	def onFromSelect(self, event):
-		if event.GetString() == lngModule.g("auto"):
+		if event.GetString() == dicSourceLang["auto"]:
 			self._swapChoice.Enable()
 			self.autoSwapChk.Enable()
 		else:
@@ -103,17 +106,17 @@ class InstantTranslateSettingsPanel(SettingsPanel):
 			self.autoSwapChk.Disable()
 
 	def onSave(self):
-		self.addonConf['from'] = langslist[self._fromChoice.GetStringSelection()]
-		self.addonConf['into'] = langslist[self._intoChoice.GetStringSelection()]
-		self.addonConf['swap'] = langslist[self._swapChoice.GetStringSelection()]
+		self.addonConf['from'] = self.getDictKey(dicSourceLang, self._fromChoice.GetStringSelection())
+		self.addonConf['into'] = self.getDictKey(dicTargetLang, self._intoChoice.GetStringSelection())
+		self.addonConf['swap'] = self.getDictKey(dicTargetLang, self._swapChoice.GetStringSelection())
 		self.addonConf['copytranslatedtext'] = self.copyTranslationChk.GetValue()
 		self.addonConf['autoswap'] = self.autoSwapChk.GetValue()
 		self.addonConf['replaceUnderscores'] = self.replaceUnderscores.GetValue()
 		self.addonConf['useMirror'] = self.useMirror.GetValue()
 
-	def getDictKey(self, currentValue):
-		for key, value in langslist.items():
+	def getDictKey(self, dicLang, currentValue):
+		for (key, value) in dicLang.items():
 			if value == currentValue:
 				return key
 		# set English if search fails
-		return lngModule.g("en")
+		return dicLang["en"]

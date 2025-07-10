@@ -9,7 +9,7 @@
 
 from functools import wraps, lru_cache
 from .interface import InstantTranslateSettingsPanel
-from .langslist import g
+from .langslist import langNameToReport
 from .speechOnDemand import getSpeechOnDemandParameter, executeWithSpeakOnDemand
 from locale import getdefaultlocale
 from time import sleep
@@ -263,7 +263,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# Translators: message presented to announce that the source and target languages have been swapped.
 		ui.message(_("Languages swapped"))
 		# Translators: message presented to announce the current source and target languages.
-		ui.message(_("Translate: from {lang1} to {lang2}").format(lang1=g(self.lang_from, short=True), lang2=g(self.lang_to, short=True)))
+		ui.message(_("Translate: from {lang1} to {lang2}").format(
+			lang1=langNameToReport(self.lang_from, source=True),
+			lang2=langNameToReport(self.lang_to, source=False),
+		))
 		try:
 			# NVDA 2024.1+
 			shouldTranslate = speech.getState().speechMode != speech.SpeechMode.onDemand
@@ -280,7 +283,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	)
 	def script_announceLanguages(self, gesture):
 		# Translators: message presented to announce the current source and target languages.
-		ui.message(_("Translate: from {lang1} to {lang2}").format(lang1=g(self.lang_from, short=True), lang2=g(self.lang_to, short=True)))
+		ui.message(_("Translate: from {lang1} to {lang2}").format(
+			lang1=langNameToReport(self.lang_from, source=True),
+			lang2=langNameToReport(self.lang_to, source=False),
+		))
 
 	@scriptHandler.script(
 	)
@@ -318,7 +324,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 				i = 0
 		myTranslator.join()
 		language = myTranslator.lang_detected
-		queueHandler.queueFunction(queueHandler.eventQueue, ui.message, g(language))
+		queueHandler.queueFunction(queueHandler.eventQueue, ui.message, langNameToReport(language, source=False))
 
 	def _localSpeak(self, sequence, *args, **kwargs):
 		text_items = [x for x in sequence if isinstance(x, str)]

@@ -126,7 +126,7 @@ langcodes = [
 	"ca",
 	"ceb",
 	"ckb",
-	"co",
+	"br",
 	"cs",
 	"cy",
 	"da",
@@ -246,11 +246,58 @@ langcodes = [
 	"zu",
 ]
 
-langslist = {}
-for code in langcodes:
-	name = g(code)
+def getLangDic(sourceLanguage=True, lang=None):
+	import urllib.request
+	import json
+	from languageHandler import getLanguage
+
+	if not lang:
+		lang = getLanguage()
+
+	url = f"https://translate.googleapis.com/translate_a/l?client=gtx&hl={lang}"
+	log.info(url)
+	headers = {"User-Agent": "Mozilla/5.0"}
+	req = urllib.request.Request(url, headers=headers)
+	
+	with urllib.request.urlopen(req) as response:
+	    data = json.loads(response.read().decode("utf-8"))
+	
+	dic = data['sl' if sourceLanguage else 'tl']
+	return dic
+		
+dicSourceLang = getLangDic(sourceLanguage=True)
+dicTargetLang = getLangDic(sourceLanguage=False)
+
+def langNameToReport(code, source=True):
+	"""Return a description for the language code passed as parameter, to be used in the commands
+	"Identify language", "Swap source and target", etc.
+
+	The first found description is returned in the following check order:
+	- for "auto", a shorter description than the one provided by Google
+	- the description returned by Google
+	If all these checks fail, return the code.
+	"""
+	
+	if code == "auto":
+		# Translators: A short description for "Automatically detect language" language choice, reported when
+		# the user requests or swaps the current configuration.
+		return _("Automatic")
+	if source:
+		dic = dicSourceLang
+	else:
+		dic = dicTargetLang
 	try:
-		oldName = langslist[name]
-		log.error(f'Unable to add "{name}" (code "{code}"): this language name already exists for code "{oldName}".')
+		return dic[code]
 	except KeyError:
-		langslist[name] = code
+		log.debugWarning(f"Unknown language code: '{code}'")
+		pass
+	desc = getLanguageDescription(code)
+	if desc:
+		return desc
+	if code in needed_codes:
+		return needed_codes[code]
+	return code
+
+langcodes = list(getLangDic(sourceLanguage=True).keys())
+langcodes.remove("auto")
+langcodes.insert(0, "auto")
