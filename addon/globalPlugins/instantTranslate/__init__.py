@@ -9,7 +9,7 @@
 
 from functools import wraps, lru_cache
 from .interface import InstantTranslateSettingsPanel
-from .langslist import langNameToReport
+from .langslist import langNameToReport, updateLangsList
 from .speechOnDemand import getSpeechOnDemandParameter, executeWithSpeakOnDemand
 from locale import getdefaultlocale
 from time import sleep
@@ -106,6 +106,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		super().__init__(*args, **kwargs)
 		if globalVars.appArgs.secure:
 			return
+		
+		updateLangsList()
 		config.conf.spec[addonName] = confspec
 		self.addonConf = config.conf[addonName]
 		self.toggling = False
@@ -136,7 +138,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		tones.beep(120, 100)
 
 	@scriptHandler.script(
-		description=_("Instant Translate layer commands. t translates selected text, shift+t translates clipboard text, a announces current swap configuration, s swaps source and target languages, c copies last result to clipboard, i identify the language of selected text, l translates last spoken text, o opens translation setting dialog.")
+		description=_("Instant Translate layer commands. Then press h to list available commands.")
 	)
 	def script_ITLayer(self, gesture):
 		# A run-time binding will occur from which we can perform various layered translation commands.

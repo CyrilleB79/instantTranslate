@@ -10,7 +10,7 @@ import wx
 import gui
 import gui.guiHelper
 from gui.settingsDialogs import SettingsPanel
-from .langslist import dicSourceLang, dicTargetLang
+from .langslist import getLangData
 import addonHandler
 from copy import deepcopy
 from locale import strxfrm
@@ -62,9 +62,9 @@ class InstantTranslateSettingsPanel(SettingsPanel):
 		self.donateBtn = helper.addItem(wx.Button(self, label=_("Support an author...")))
 		self.donateBtn.Bind(wx.EVT_BUTTON, self.onDonate)
 
-		iLang_from = self._fromChoice.FindString(dicSourceLang[self.addonConf['from']])
-		iLang_to = self._intoChoice.FindString(dicTargetLang[self.addonConf['into']])
-		iLang_swap = self._swapChoice.FindString(dicTargetLang[self.addonConf['swap']])
+		iLang_from = self._fromChoice.FindString(getLangData()['sl'][self.addonConf['from']])
+		iLang_to = self._intoChoice.FindString(getLangData()['tl'][self.addonConf['into']])
+		iLang_swap = self._swapChoice.FindString(getLangData()['tl'][self.addonConf['swap']])
 		
 		self._fromChoice.Select(iLang_from)
 		self._intoChoice.Select(iLang_to)
@@ -82,9 +82,9 @@ class InstantTranslateSettingsPanel(SettingsPanel):
 
 	def prepareChoices(self, source=True):
 		if source:
-			dic = dicSourceLang
+			dic = getLangData()['sl']
 		else:
-			dic = dicTargetLang
+			dic = getLangData()['tl']
 		values = list(dic.values())
 		try:
 			values.remove(dic["auto"])
@@ -98,7 +98,7 @@ class InstantTranslateSettingsPanel(SettingsPanel):
 		return choices
 		
 	def onFromSelect(self, event):
-		if event.GetString() == dicSourceLang["auto"]:
+		if event.GetString() == getLangData()['sl']["auto"]:
 			self._swapChoice.Enable()
 			self.autoSwapChk.Enable()
 		else:
@@ -106,7 +106,7 @@ class InstantTranslateSettingsPanel(SettingsPanel):
 			self.autoSwapChk.Disable()
 
 	def onSave(self):
-		self.addonConf['from'] = self.getDictKey(dicSourceLang, self._fromChoice.GetStringSelection())
+		self.addonConf['from'] = self.getDictKey(getLangData()['sl' ], self._fromChoice.GetStringSelection())
 		self.addonConf['into'] = self.getDictKey(dicTargetLang, self._intoChoice.GetStringSelection())
 		self.addonConf['swap'] = self.getDictKey(dicTargetLang, self._swapChoice.GetStringSelection())
 		self.addonConf['copytranslatedtext'] = self.copyTranslationChk.GetValue()

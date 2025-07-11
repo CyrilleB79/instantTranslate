@@ -6,12 +6,18 @@
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
-from languageHandler import getLanguageDescription
+import os
+import json
+import urllib.request
+
+from languageHandler import getLanguageDescription, getLanguage
 from logHandler import log
 import addonHandler
 addonHandler.initTranslation()
 
-def g(code, short=False):
+LANG_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "langData")
+
+def old_g(code, short=False):
 	"""Return a description for the language code passed as parameter. The first found code is returned.
 	The check order is the following:
 	- the code in the forced codes list, i.e. codes for which NVDA/Windows do not return a satisfactory description
@@ -108,165 +114,29 @@ needed_codes = {
 	"yi":_("Yiddish"),
 }
 
-langcodes = [
-	"auto",
-	"af",
-	"ak",
-	"am",
-	"ar",
-	"as",
-	"ay",
-	"az",
-	"be",
-	"bg",
-	"bho",
-	"bm",
-	"bn",
-	"bs",
-	"ca",
-	"ceb",
-	"ckb",
-	"br",
-	"cs",
-	"cy",
-	"da",
-	"de",
-	"doi",
-	"dv",
-	"ee",
-	"el",
-	"en",
-	"eo",
-	"es",
-	"et",
-	"eu",
-	"fa",
-	"fi",
-	"fil",
-	"fr",
-	"fy",
-	"ga",
-	"gd",
-	"gl",
-	"gn",
-	"gom",
-	"gu",
-	"ha",
-	"haw",
-	"he",
-	"hi",
-	"hmn",
-	"hr",
-	"ht",
-	"hu",
-	"hy",
-	"id",
-	"ig",
-	"ilo",
-	"is",
-	"it",
-	"ja",
-	"jv",
-	"ka",
-	"kk",
-	"km",
-	"kn",
-	"ko",
-	"kri",
-	"ku",
-	"ky",
-	"la",
-	"lb",
-	"lg",
-	"ln",
-	"lo",
-	"lt",
-	"lus",
-	"lv",
-	"mai",
-	"mg",
-	"mi",
-	"mk",
-	"ml",
-	"mn",
-	"mni-Mtei",
-	"mr",
-	"ms",
-	"mt",
-	"my",
-	"ne",
-	"nl",
-	"no",
-	"nso",
-	"ny",
-	"om",
-	"or",
-	"pa",
-	"pl",
-	"ps",
-	"pt",
-	"qu",
-	"ro",
-	"ru",
-	"rw",
-	"sa",
-	"sd",
-	"si",
-	"sk",
-	"sl",
-	"sm",
-	"sn",
-	"so",
-	"sq",
-	"sr",
-	"st",
-	"su",
-	"sv",
-	"sw",
-	"ta",
-	"te",
-	"tg",
-	"th",
-	"ti",
-	"tk",
-	"tl",
-	"tr",
-	"ts",
-	"tt",
-	"ug",
-	"uk",
-	"ur",
-	"uz",
-	"vi",
-	"xh",
-	"yi",
-	"yo",
-	"zh-CN",
-	"zh-TW",
-	"zu",
-]
-
-def getLangDic(sourceLanguage=True, lang=None):
-	import urllib.request
-	import json
-	from languageHandler import getLanguage
-
-	if not lang:
-		lang = getLanguage()
-
+def saveLangJson(lang, filePath):
 	url = f"https://translate.googleapis.com/translate_a/l?client=gtx&hl={lang}"
-	log.info(url)
 	headers = {"User-Agent": "Mozilla/5.0"}
 	req = urllib.request.Request(url, headers=headers)
 	
 	with urllib.request.urlopen(req) as response:
-	    data = json.loads(response.read().decode("utf-8"))
+		data = json.loads(response.read().decode("utf-8"))
+
+	with open(filePath, "w", encoding="utf-8") as f:
+		json.dump(data, f, ensure_ascii=False, indent=2)
+
+def loadLangJson(filePath):
+	with open(filePath, "r", encoding="utf-8") as f:
+		data = json.load(f)
+		return data
+
+def updateLangsList(lang=None):
+	if not lang:
+		lang = getLanguage()
+	fileName = os.path.join(LANG_DATA_DIR, f"{lang}.json")
+	saveLangJson(lang, filePath=fileName)
 	
-	dic = data['sl' if sourceLanguage else 'tl']
-	return dic
 		
-dicSourceLang = getLangDic(sourceLanguage=True)
-dicTargetLang = getLangDic(sourceLanguage=False)
 
 def langNameToReport(code, source=True):
 	"""Return a description for the language code passed as parameter, to be used in the commands
@@ -283,9 +153,9 @@ def langNameToReport(code, source=True):
 		# the user requests or swaps the current configuration.
 		return _("Automatic")
 	if source:
-		dic = dicSourceLang
+		dic = getLangData()['sl']
 	else:
-		dic = dicTargetLang
+		dic = getLangData()['tl']
 	try:
 		return dic[code]
 	except KeyError:
@@ -298,6 +168,9 @@ def langNameToReport(code, source=True):
 		return needed_codes[code]
 	return code
 
-langcodes = list(getLangDic(sourceLanguage=True).keys())
-langcodes.remove("auto")
-langcodes.insert(0, "auto")
+_langData = None
+def getLangData():
+	global _langData
+	if _langData is None:
+		_langData = loadLangJson(os.path.join(LANG_DATA_DIR, f"{getLanguage()}.json"))
+	return _langData
