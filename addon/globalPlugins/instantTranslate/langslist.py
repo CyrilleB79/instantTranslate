@@ -9,6 +9,7 @@
 import os
 import json
 import urllib.request
+import threading
 
 from languageHandler import getLanguageDescription, getLanguage
 from logHandler import log
@@ -16,32 +17,6 @@ import addonHandler
 addonHandler.initTranslation()
 
 LANG_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "langData")
-
-def old_g(code, short=False):
-	"""Return a description for the language code passed as parameter. The first found code is returned.
-	The check order is the following:
-	- the code in the forced codes list, i.e. codes for which NVDA/Windows do not return a satisfactory description
-	- the code is in NVDA/Windows language description
-	- the code in the list of needed codes, i.e. codes not available in some versions of Windows
-	If all these checks fail, return the code.
-	If short is True, returns a more compact description for the "auto" special code.
-	"""
-	if short and code == "auto":
-		# Translators: A short description for "Automatically detect language" language choice, reported when
-		# the user requests or swaps the current configuration.
-		return _("Automatic")
-	if code in forced_codes:
-		return forced_codes[code]
-	res = getLanguageDescription(code)
-	if res is not None: return res
-	if code in needed_codes:
-		return needed_codes[code]
-	return code
-
-forced_codes = {
-	# Translators: The name of a language supported by this add-on.
-	"ckb": _("Kurdish (Sorani)"),
-}
 
 needed_codes = {
 	# Translators: An option to automatically detect source language for translation.
@@ -114,29 +89,53 @@ needed_codes = {
 	"yi":_("Yiddish"),
 }
 
-def saveLangJson(lang, filePath):
+fileLock = threading.Lock()
+
+def fetchLangData(lang, filePath):
 	url = f"https://translate.googleapis.com/translate_a/l?client=gtx&hl={lang}"
 	headers = {"User-Agent": "Mozilla/5.0"}
 	req = urllib.request.Request(url, headers=headers)
 	
-	with urllib.request.urlopen(req) as response:
-		data = json.loads(response.read().decode("utf-8"))
+	try:
+		with urllib.request.urlopen(req) as response:
+			data = json.loads(response.read().decode("utf-8"))
+	except urllib.error.URLError:
+		log.debugWarning("Could not update language data. No internet connection.")
+		return
 
-	with open(filePath, "w", encoding="utf-8") as f:
-		json.dump(data, f, ensure_ascii=False, indent=2)
+	def writeToFile(jsonData, path):
+		try:
+			with fileLock:
+				with open(path, "w", encoding="utf-8") as f:
+					json.dump(jsonData, f, ensure_ascii=False, indent=2)
+		except Exception as e:
+			log.error(f"Exception {e} while writing to file: {filePath}", stack_info=True)
+	writer = threading.Thread(
+		target=writeToFile,
+		args=(data, filePath),
+		name="LanguageDataFileWriter",
+	)
+	writer.daemon = False  # Ensure file writing finishes
+	writer.start()
+	writer.join()
 
 def loadLangJson(filePath):
-	with open(filePath, "r", encoding="utf-8") as f:
-		data = json.load(f)
-		return data
+	with fileLock:
+		with open(filePath, "r", encoding="utf-8") as f:
+			data = json.load(f)
+	return data
 
 def updateLangsList(lang=None):
 	if not lang:
 		lang = getLanguage()
-	fileName = os.path.join(LANG_DATA_DIR, f"{lang}.json")
-	saveLangJson(lang, filePath=fileName)
-	
-		
+	filePath = os.path.join(LANG_DATA_DIR, f"{lang}.json")
+	t = threading.Thread(
+		target=fetchLangData,
+		args=(lang, filePath),
+		name="LanguageDataFetcher",
+	)
+	t.daemon = True  # Allows program to exit during network fetch
+	t.start()
 
 def langNameToReport(code, source=True):
 	"""Return a description for the language code passed as parameter, to be used in the commands
@@ -160,17 +159,16 @@ def langNameToReport(code, source=True):
 		return dic[code]
 	except KeyError:
 		log.debugWarning(f"Unknown language code: '{code}'")
-		pass
-	desc = getLanguageDescription(code)
-	if desc:
-		return desc
-	if code in needed_codes:
-		return needed_codes[code]
 	return code
 
 _langData = None
 def getLangData():
 	global _langData
 	if _langData is None:
-		_langData = loadLangJson(os.path.join(LANG_DATA_DIR, f"{getLanguage()}.json"))
+		lang = getLanguage()
+		try:
+			_langData = loadLangJson(os.path.join(LANG_DATA_DIR, f"{lang}.json"))
+		except FileNotFoundError:
+			log.debugWarning(f"Could not load language data file for {lang}; fallback to English.")
+			_langData = loadLangJson(os.path.join(LANG_DATA_DIR, f"en.json"))
 	return _langData
